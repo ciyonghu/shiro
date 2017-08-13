@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+	
+	<bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+		<property name="cacheManager" ref="cacheManager"></property>
+		<!-- <property name="realm" ref="shiroRealm"></property> -->
+		<property name="authenticator" ref="authenticator"></property>
+		<property name="realms">
+			<list>
+				<ref bean="shiroRealm"/>
+				<ref bean="secondRealm"/>
+			</list>
+		</property>
+	</bean>
+	
+	<bean id="authenticator" class="org.apache.shiro.authc.pam.ModularRealmAuthenticator">
+		<!-- <property name="realms">
+			<list>
+				<ref bean="shiroRealm"/>
+				<ref bean="secondRealm"/>
+			</list>
+		</property> -->
+		<property name="authenticationStrategy">
+			<bean class="org.apache.shiro.authc.pam.AllSuccessfulStrategy"></bean>
+		</property>
+	</bean>
+	
+    <!-- =========================================================
+         Shiro Core Components - Not Spring Specific
+         ========================================================= -->
+    <!-- Shiro's main business-tier object for web-enabled applications
+         (use DefaultSecurityManager instead when there is no web environment)-->
+    <!-- <bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+        <property name="cacheManager" ref="cacheManager"/>
+        Single realm app.  If you have multiple realms, use the 'realms' property instead.
+        <property name="sessionMode" value="native"/>
+        <property name="realm" ref="jdbcRealm"/>
+    </bean> -->
+
+    <!-- Let's use some enterprise caching support for better performance.  You can replace this with any enterprise
+         caching framework implementation that you like (Terracotta+Ehcache, Coherence, GigaSpaces, etc -->
+    <bean id="cacheManager" class="org.apache.shiro.cache.ehcache.EhCacheManager">
+        <!-- Set a net.sf.ehcache.CacheManager instance here if you already have one.  If not, a new one
+             will be creaed with a default config:
+             <property name="cacheManager" ref="ehCacheManager"/> -->
+        <!-- If you don't have a pre-built net.sf.ehcache.CacheManager instance to inject, but you want
+             a specific Ehcache configuration to be used, specify that here.  If you don't, a default
+             will be used.: -->
+        <property name="cacheManagerConfigFile" value="classpath:/ehcache.xml"/>
+    </bean>
+
+    <!-- Used by the SecurityManager to access security data (users, roles, etc).
+         Many other realm implementations can be used too (PropertiesRealm,
+         LdapRealm, etc. -->
+    <bean id="shiroRealm" class="com.rtdl.shiro.realm.ShiroRealm">
+        <property name="credentialsMatcher">
+        	<bean class="org.apache.shiro.authc.credential.HashedCredentialsMatcher">
+        		<property name="hashAlgorithmName" value="MD5"></property>
+        		<property name="hashIterations" value="1024"></property>
+        	</bean>
+        </property>
+    </bean>
+    
+    <bean id="secondRealm" class="com.rtdl.shiro.realm.SecondRealm">
+    	<property name="credentialsMatcher">
+    		<bean class="org.apache.shiro.authc.credential.HashedCredentialsMatcher">
+    			<property name="hashAlgorithmName" value="SHA1"></property>
+    			<property name="hashIterations" value="1024"></property>
+    		</bean>
+    	</property>
+    </bean>
+
+    <!-- =========================================================
+         Shiro Spring-specific integration
+         ========================================================= -->
+    <!-- Post processor that automatically invokes init() and destroy() methods
+         for Spring-configured Shiro objects so you don't have to
+         1) specify an init-method and destroy-method attributes for every bean
+            definition and
+         2) even know which Shiro objects require these methods to be
+            called. -->
+      <!-- 可以自动的加载 spring IOC 容器中配置的 shiro bean 的生命周期方法 -->
+    <bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor"/>
+
+    <!-- Enable Shiro Annotations for Spring-configured beans.  Only run after
+         the lifecycleBeanProcessor has run: -->
+     <!-- 必须得在配置了的LifeCycleBeanPostProccesor的前提下使用，使用注解方式 -->
+    <bean class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator"
+          depends-on="lifecycleBeanPostProcessor"/>
+    <bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">
+        <property name="securityManager" ref="securityManager"/>
+    </bean>
+
+    
+
+    <!-- Define the Shiro Filter here (as a FactoryBean) instead of directly in web.xml -
+         web.xml uses the DelegatingFilterProxy to access this bean.  This allows us
+         to wire things with more control as well utilize nice Spring things such as
+         PropertiesPlaceholderConfigurer and abstract beans or anything else we might need: -->
+    <bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+        <property name="securityManager" ref="securityManager"/>
+        <property name="loginUrl" value="/login.jsp"/>
+        <property name="successUrl" value="/list.jsp"/>
+        <property name="unauthorizedUrl" value="/unauthorized.jsp"/>
+        <!-- The 'filters' property is not necessary since any declared javax.servlet.Filter bean
+             defined will be automatically acquired and available via its beanName in chain
+             definitions, but you can perform overrides or parent/child consolidated configuration
+             here if you like: -->
+        <!-- <property name="filters">
+            <util:map>
+                <entry key="aName" value-ref="someFilterPojo"/>
+            </util:map>
+        </property> -->
+        <property name="filterChainDefinitions">
+            <value>
+               	/login.jsp = anon
+               	/shiro/login = anon
+               	/shiro/logout = logout
+               	/user.jsp = roles['user']
+               	/admin.jsp = roles['admin']
+                # allow WebStart to pull the jars for the swing app:
+                
+                # everything else requires authentication:
+                /** = authc
+            </value>
+        </property>
+    </bean>
+
+</beans>
