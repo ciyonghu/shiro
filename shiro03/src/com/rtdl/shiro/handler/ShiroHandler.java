@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 public class ShiroHandler {
 	public static Logger log = LoggerFactory.getLogger(ShiroHandler.class);
 	
+	
 	@RequestMapping("/login")
 	public String login(String username,String password){
 		System.out.println(username + " : " + password);
